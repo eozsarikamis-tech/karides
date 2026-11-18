@@ -1,0 +1,8 @@
+{
+  "name": "Remix AquaBreeder Pro",
+  "description": "Caridina, Neocaridina ve Apistogramma türleri için profesyonel mini üretimhane, seçici ıslah, akvaryum parametre ve hobi gelir yönetim platformu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -37,17 +37,17 @@ interface DashboardViewProps {
   onInspectBatch?: (batch: BatchPurchase) => void;
 }
 
-const HERO_BIOTOPE_IMAGE = '/public/images/south_america_biotope_1794001814309.jpg';
-const HERO_HOME_RACKS_IMAGE = '/public/images/home_fishroom_racks_1794584113641.jpg';
+const HERO_BIOTOPE_IMAGE = '/images/south_america_biotope_1794001814309.jpg';
+const HERO_HOME_RACKS_IMAGE = '/images/home_fishroom_racks_1794584113641.jpg';
 
 const HERO_IMAGE_OPTIONS = [
   {
-    public: HERO_BIOTOPE_IMAGE,
+    images: HERO_BIOTOPE_IMAGE,
     label: 'Güney Amerika Biyotop (Önceki)',
     alt: 'Tekil Güney Amerika Biyotop Akvaryumu - Apistogramma Doğal Yaşam Alanı',
   },
   {
-    public: HERO_HOME_RACKS_IMAGE,
+    images: HERO_HOME_RACKS_IMAGE,
     label: 'Ev İşletmesi (2 Set Akvaryum)',
     alt: 'Karides Yuvası Ev İşletmesi - Neocaridina, Caridina ve Cüce Cichlid Akvaryum Setleri',
   },
@@ -164,7 +164,7 @@ function getCustomGroupImage(
     haystack.includes('copcu')
   ) {
     return {
-      public: '/public/images/images/sterbai_corydoras_1794583669825.jpg',
+      public: '/images/images/sterbai_corydoras_1794583669825.jpg',
       alt: 'Corydoras Sterbai',
     };
   }
@@ -179,7 +179,7 @@ function getCustomGroupImage(
     haystack.includes('full red')
   ) {
     return {
-      public: '/public/images/images/full_red_guppy_1794583668541.jpg',
+      public: '/images/images/full_red_guppy_1794583668541.jpg',
       alt: 'Full Red Lepistes',
     };
   }
@@ -696,7 +696,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Caridina Karides Kolonisi',
               badgeText: 'Caridina Kolonisi',
               badgeClass: 'text-red-300',
-              imageSrc: '/public/images/caridina_crystal_shrimp_1793999662698.jpg',
+              imageSrc: '/images/caridina_crystal_shrimp_1793999662698.jpg',
               imageAlt: 'Caridina Crystal Red Shrimp',
               batches: caridinaStats.batches,
               sales: caridinaStats.sales,
@@ -715,7 +715,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="h-28 sm:h-40 w-full overflow-hidden relative">
             <img
-              src="/src/public/images/caridina_crystal_shrimp_1793999662698.jpg"
+              public="/images/caridina_crystal_shrimp_1793999662698.jpg"
               alt="Caridina Crystal Red Shrimp"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               referrerPolicy="no-referrer"
@@ -765,7 +765,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Neocaridina Karides Kolonisi',
               badgeText: 'Neocaridina Kolonisi',
               badgeClass: 'text-blue-300',
-              imageSrc: '/src/public/images/neocaridina_blue_shrimp_1793999664008.jpg',
+              imageSrc: '/public/images/neocaridina_blue_shrimp_1793999664008.jpg',
               imageAlt: 'Neocaridina Blue Dream Shrimp',
               batches: neocaridinaStats.batches,
               sales: neocaridinaStats.sales,
@@ -784,7 +784,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="h-28 sm:h-40 w-full overflow-hidden relative">
             <img
-              src="/src/public/images/neocaridina_blue_shrimp_1793999664008.jpg"
+              src="/images/neocaridina_blue_shrimp_1793999664008.jpg"
               alt="Neocaridina Blue Dream Shrimp"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               referrerPolicy="no-referrer"
@@ -834,7 +834,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Güney Amerika Cüce Cichlid Hatları',
               badgeText: 'Cüce Cichlid',
               badgeClass: 'text-amber-300',
-              imageSrc: '/public/images/apistogramma_cichlid_1793999664297.jpg',
+              imagePublic: '/images/apistogramma_cichlid_1793999664297.jpg',
               imageAlt: 'Apistogramma Cacatuoides Dwarf Cichlid',
               batches: apistogrammaStats.batches,
               sales: apistogrammaStats.sales,

@@ -42,9 +42,9 @@ const HERO_HOME_RACKS_IMAGE = '/public/images/home_fishroom_racks_1794584113641.
 
 const HERO_IMAGE_OPTIONS = [
   {
-    src: HERO_BIOTOPE_IMAGE,
+    public: HERO_BIOTOPE_IMAGE,
     label: 'Güney Amerika Biyotop (Önceki)',
-    alt: 'Tekil Güney Amerika Biyotop Akvaryumu - Apistogramma Doğal Yaşam Alanı',
+    public: 'Tekil Güney Amerika Biyotop Akvaryumu - Apistogramma Doğal Yaşam Alanı',
   },
   {
     src: HERO_HOME_RACKS_IMAGE,

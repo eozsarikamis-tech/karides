@@ -44,10 +44,10 @@ const HERO_IMAGE_OPTIONS = [
   {
     public: HERO_BIOTOPE_IMAGE,
     label: 'Güney Amerika Biyotop (Önceki)',
-    public: 'Tekil Güney Amerika Biyotop Akvaryumu - Apistogramma Doğal Yaşam Alanı',
+    alt: 'Tekil Güney Amerika Biyotop Akvaryumu - Apistogramma Doğal Yaşam Alanı',
   },
   {
-    src: HERO_HOME_RACKS_IMAGE,
+    public: HERO_HOME_RACKS_IMAGE,
     label: 'Ev İşletmesi (2 Set Akvaryum)',
     alt: 'Karides Yuvası Ev İşletmesi - Neocaridina, Caridina ve Cüce Cichlid Akvaryum Setleri',
   },

@@ -37,8 +37,8 @@ interface DashboardViewProps {
   onInspectBatch?: (batch: BatchPurchase) => void;
 }
 
-const HERO_BIOTOPE_IMAGE = '/src/public/images/south_america_biotope_1794001814309.jpg';
-const HERO_HOME_RACKS_IMAGE = '/src/public/images/home_fishroom_racks_1794584113641.jpg';
+const HERO_BIOTOPE_IMAGE = '/public/images/south_america_biotope_1794001814309.jpg';
+const HERO_HOME_RACKS_IMAGE = '/public/images/home_fishroom_racks_1794584113641.jpg';
 
 const HERO_IMAGE_OPTIONS = [
   {

@@ -765,7 +765,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Neocaridina Karides Kolonisi',
               badgeText: 'Neocaridina Kolonisi',
               badgeClass: 'text-blue-300',
-              imageSrc: '/public/images/neocaridina_blue_shrimp_1793999664008.jpg',
+              imageSrc: 'images/neocaridina_blue_shrimp_1793999664008.jpg',
               imageAlt: 'Neocaridina Blue Dream Shrimp',
               batches: neocaridinaStats.batches,
               sales: neocaridinaStats.sales,

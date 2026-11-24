@@ -164,7 +164,7 @@ function getCustomGroupImage(
     haystack.includes('copcu')
   ) {
     return {
-      src: '/src/assets/images/sterbai_corydoras_1794583669825.jpg',
+      public: '/public/images/images/sterbai_corydoras_1794583669825.jpg',
       alt: 'Corydoras Sterbai',
     };
   }
@@ -179,7 +179,7 @@ function getCustomGroupImage(
     haystack.includes('full red')
   ) {
     return {
-      src: '/src/assets/images/full_red_guppy_1794583668541.jpg',
+      public: '/public/images/images/full_red_guppy_1794583668541.jpg',
       alt: 'Full Red Lepistes',
     };
   }
@@ -696,7 +696,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Caridina Karides Kolonisi',
               badgeText: 'Caridina Kolonisi',
               badgeClass: 'text-red-300',
-              imageSrc: '/src/assets/images/caridina_crystal_shrimp_1793999662698.jpg',
+              imageSrc: '/public/images/caridina_crystal_shrimp_1793999662698.jpg',
               imageAlt: 'Caridina Crystal Red Shrimp',
               batches: caridinaStats.batches,
               sales: caridinaStats.sales,
@@ -715,7 +715,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="h-28 sm:h-40 w-full overflow-hidden relative">
             <img
-              src="/src/assets/images/caridina_crystal_shrimp_1793999662698.jpg"
+              src="/src/public/images/caridina_crystal_shrimp_1793999662698.jpg"
               alt="Caridina Crystal Red Shrimp"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               referrerPolicy="no-referrer"
@@ -765,7 +765,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Neocaridina Karides Kolonisi',
               badgeText: 'Neocaridina Kolonisi',
               badgeClass: 'text-blue-300',
-              imageSrc: '/src/assets/images/neocaridina_blue_shrimp_1793999664008.jpg',
+              imageSrc: '/src/public/images/neocaridina_blue_shrimp_1793999664008.jpg',
               imageAlt: 'Neocaridina Blue Dream Shrimp',
               batches: neocaridinaStats.batches,
               sales: neocaridinaStats.sales,
@@ -784,7 +784,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="h-28 sm:h-40 w-full overflow-hidden relative">
             <img
-              src="/src/assets/images/neocaridina_blue_shrimp_1793999664008.jpg"
+              src="/src/public/images/neocaridina_blue_shrimp_1793999664008.jpg"
               alt="Neocaridina Blue Dream Shrimp"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               referrerPolicy="no-referrer"
@@ -834,7 +834,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Güney Amerika Cüce Cichlid Hatları',
               badgeText: 'Cüce Cichlid',
               badgeClass: 'text-amber-300',
-              imageSrc: '/src/assets/images/apistogramma_cichlid_1793999664297.jpg',
+              imageSrc: '/public/images/apistogramma_cichlid_1793999664297.jpg',
               imageAlt: 'Apistogramma Cacatuoides Dwarf Cichlid',
               batches: apistogrammaStats.batches,
               sales: apistogrammaStats.sales,
@@ -853,7 +853,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="h-28 sm:h-40 w-full overflow-hidden relative">
             <img
-              src="/src/assets/images/apistogramma_cichlid_1793999664297.jpg"
+              src="/public/images/apistogramma_cichlid_1793999664297.jpg"
               alt="Apistogramma Cacatuoides Dwarf Cichlid"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               referrerPolicy="no-referrer"
@@ -903,7 +903,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Pleco & Vatos Grubu',
               badgeText: 'Pleco Grubu',
               badgeClass: 'text-teal-300',
-              imageSrc: '/src/assets/images/sturisoma_panamense_pleco_1794584454696.jpg',
+              imageSrc: '/public/images/sturisoma_panamense_pleco_1794584454696.jpg',
               imageAlt: 'Sturisoma panamense - Pleco',
               batches: plecoStats.batches,
               sales: plecoStats.sales,
@@ -922,7 +922,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="h-28 sm:h-40 w-full overflow-hidden relative">
             <img
-              src="/src/assets/images/sturisoma_panamense_pleco_1794584454696.jpg"
+              src="/public/images/sturisoma_panamense_pleco_1794584454696.jpg"
               alt="Sturisoma panamense - Pleco"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               referrerPolicy="no-referrer"

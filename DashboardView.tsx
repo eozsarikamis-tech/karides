@@ -1,17 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   TrendingUp,
   Wallet,
   Coins,
   PlusCircle,
-  Fish,
   Image as ImageIcon,
-  Check,
+  Upload,
+  Trash2,
+  X,
   Sparkles,
 } from 'lucide-react';
 import { BatchPurchase, Tank, Sale, BreedingSpawn, Expense } from '../types';
 import { BusinessProfile, calculateHatcheryMetrics } from '../utils/storage';
 import { useSpeciesList, formatSpeciesLabel } from '../utils/speciesStorage';
+import {
+  compressImageFileToDataUrl,
+  isLegacyStockHeroImage,
+  loadSpeciesImages,
+  saveSpeciesImagesMap,
+} from '../utils/imageUpload';
 import { LiveStockTrendChart } from './LiveStockTrendChart';
 import { SalesTrendChart } from './SalesTrendChart';
 import {
@@ -37,88 +44,22 @@ interface DashboardViewProps {
   onInspectBatch?: (batch: BatchPurchase) => void;
 }
 
-const HERO_BIOTOPE_IMAGE = '/images/south_america_biotope_1794001814309.jpg';
-const HERO_HOME_RACKS_IMAGE = '/images/home_fishroom_racks_1794584113641.jpg';
-
-const HERO_IMAGE_OPTIONS = [
-  {
-    images: HERO_BIOTOPE_IMAGE,
-    label: 'Güney Amerika Biyotop (Önceki)',
-    alt: 'Tekil Güney Amerika Biyotop Akvaryumu - Apistogramma Doğal Yaşam Alanı',
-  },
-  {
-    images: HERO_HOME_RACKS_IMAGE,
-    label: 'Ev İşletmesi (2 Set Akvaryum)',
-    alt: 'Karides Yuvası Ev İşletmesi - Neocaridina, Caridina ve Cüce Cichlid Akvaryum Setleri',
-  },
-];
-
-function resolveBusinessHeroImage(biz?: BusinessProfile): { src: string; alt: string } {
-  if (biz?.heroImage) {
-    const matched = HERO_IMAGE_OPTIONS.find((opt) => opt.src === biz.heroImage);
-    return {
-      src: biz.heroImage,
-      alt: matched?.alt || `${biz.name} Kapak Görseli`,
-    };
-  }
-
-  const normName = (biz?.name || '').trim().toLocaleLowerCase('tr-TR');
-  const isEvIsletmesi =
-    normName.includes('ev işletme') ||
-    normName.includes('ev isletme') ||
-    /\bev\b/.test(normName);
-
-  if (isEvIsletmesi) {
-    return {
-      src: HERO_HOME_RACKS_IMAGE,
-      alt: HERO_IMAGE_OPTIONS[1].alt,
-    };
-  }
-
-  if (
-    normName.includes('karides yuvası') ||
-    normName.includes('karides yuvasi') ||
-    biz?.id === 'biz-a'
-  ) {
-    return {
-      src: HERO_BIOTOPE_IMAGE,
-      alt: HERO_IMAGE_OPTIONS[0].alt,
-    };
-  }
-
-  if (biz && biz.id !== 'biz-a') {
-    return {
-      src: HERO_HOME_RACKS_IMAGE,
-      alt: HERO_IMAGE_OPTIONS[1].alt,
-    };
-  }
-
-  return {
-    src: HERO_BIOTOPE_IMAGE,
-    alt: HERO_IMAGE_OPTIONS[0].alt,
-  };
-}
-
 const DEFAULT_GROUP_THEMES = [
   {
-    gradient: 'from-emerald-950/90 via-teal-900/40 to-slate-950',
     accentText: 'text-emerald-300',
-    iconBg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300',
+    emptyAccentText: 'text-emerald-700',
   },
   {
-    gradient: 'from-purple-950/90 via-indigo-900/40 to-slate-950',
     accentText: 'text-purple-300',
-    iconBg: 'bg-purple-500/15 border-purple-500/30 text-purple-300',
+    emptyAccentText: 'text-purple-700',
   },
   {
-    gradient: 'from-cyan-950/90 via-sky-900/40 to-slate-950',
     accentText: 'text-cyan-300',
-    iconBg: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300',
+    emptyAccentText: 'text-cyan-700',
   },
   {
-    gradient: 'from-rose-950/90 via-pink-900/40 to-slate-950',
     accentText: 'text-rose-300',
-    iconBg: 'bg-rose-500/15 border-rose-500/30 text-rose-300',
+    emptyAccentText: 'text-rose-700',
   },
 ];
 
@@ -151,41 +92,6 @@ function classifyDefaultGroup(
   return null;
 }
 
-function getCustomGroupImage(
-  id: string,
-  label: string,
-  strains: string[]
-): { src: string; alt: string } | null {
-  const haystack = `${id} ${label} ${strains.join(' ')}`.toLocaleLowerCase('tr-TR');
-  if (
-    haystack.includes('cory') ||
-    haystack.includes('sterbai') ||
-    haystack.includes('çöpçü') ||
-    haystack.includes('copcu')
-  ) {
-    return {
-      public: '/images/images/sterbai_corydoras_1794583669825.jpg',
-      alt: 'Corydoras Sterbai',
-    };
-  }
-  if (
-    haystack.includes('canlı doğuran') ||
-    haystack.includes('canli doguran') ||
-    haystack.includes('canli_doguran') ||
-    haystack.includes('doğuran') ||
-    haystack.includes('doguran') ||
-    haystack.includes('lepistes') ||
-    haystack.includes('guppy') ||
-    haystack.includes('full red')
-  ) {
-    return {
-      public: '/images/images/full_red_guppy_1794583668541.jpg',
-      alt: 'Full Red Lepistes',
-    };
-  }
-  return null;
-}
-
 export const DashboardView: React.FC<DashboardViewProps> = ({
   batches,
   tanks,
@@ -203,25 +109,69 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onInspectBatch,
 }) => {
   const speciesList = useSpeciesList();
-  const [isHeroMenuOpen, setIsHeroMenuOpen] = useState(false);
+  const [speciesImages, setSpeciesImages] = useState<Record<string, string>>(() =>
+    loadSpeciesImages()
+  );
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [isAiAnalystOpen, setIsAiAnalystOpen] = useState(false);
   const [selectedGroupDetail, setSelectedGroupDetail] =
     useState<SpeciesGroupDetailData | null>(null);
-  const heroMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (heroMenuRef.current && !heroMenuRef.current.contains(event.target as Node)) {
-        setIsHeroMenuOpen(false);
-      }
-    };
-    if (isHeroMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+  const activeHeroSrc =
+    activeBusiness?.heroImage && !isLegacyStockHeroImage(activeBusiness.heroImage)
+      ? activeBusiness.heroImage
+      : '';
+
+  const handleUploadHeroImage = async (file: File) => {
+    setImageUploadError(null);
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxWidth: 1280,
+        maxHeight: 720,
+        quality: 0.82,
+      });
+      onUpdateHeroImage?.(dataUrl);
+    } catch (err) {
+      setImageUploadError(
+        err instanceof Error ? err.message : 'Kapak görseli yüklenemedi.'
+      );
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isHeroMenuOpen]);
+  };
 
-  const activeHero = resolveBusinessHeroImage(activeBusiness);
+  const handleRemoveHeroImage = () => {
+    setImageUploadError(null);
+    onUpdateHeroImage?.('');
+  };
+
+  const handleUploadSpeciesImage = async (groupKey: string, file: File) => {
+    setImageUploadError(null);
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, {
+        maxWidth: 640,
+        maxHeight: 420,
+        quality: 0.82,
+      });
+      setSpeciesImages((prev) => {
+        const next = { ...prev, [groupKey]: dataUrl };
+        saveSpeciesImagesMap(next);
+        return next;
+      });
+    } catch (err) {
+      setImageUploadError(
+        err instanceof Error ? err.message : 'Tür görseli yüklenemedi.'
+      );
+    }
+  };
+
+  const handleRemoveSpeciesImage = (groupKey: string) => {
+    setImageUploadError(null);
+    setSpeciesImages((prev) => {
+      const next = { ...prev };
+      delete next[groupKey];
+      saveSpeciesImagesMap(next);
+      return next;
+    });
+  };
 
   const metrics = calculateHatcheryMetrics(batches, sales, expenses);
 
@@ -476,85 +426,120 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
-      {/* Hero Banner */}
-      <div className="relative rounded-2xl overflow-visible border border-slate-200 bg-white shadow-xl">
-        <div className="relative h-48 sm:h-72 md:h-[400px] w-full overflow-hidden rounded-2xl">
-          <img
-            src={activeHero.src}
-            alt={activeHero.alt}
-            className="w-full h-full object-cover object-center"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20 pointer-events-none" />
+      {/* Image Upload Error Notice */}
+      {imageUploadError && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+          <span>{imageUploadError}</span>
+          <button
+            type="button"
+            onClick={() => setImageUploadError(null)}
+            className="p-1 rounded-lg hover:bg-rose-100 text-rose-600 cursor-pointer shrink-0"
+            aria-label="Uyarıyı kapat"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
-          {/* Cover image switcher in bottom left */}
-          {onUpdateHeroImage && (
-            <div ref={heroMenuRef} className="absolute bottom-3 left-3 sm:bottom-6 sm:left-6 z-20">
+      {/* Hero Banner */}
+      <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+        {activeHeroSrc ? (
+          <div className="relative h-48 sm:h-72 md:h-[360px] w-full overflow-hidden">
+            <img
+              src={activeHeroSrc}
+              alt={`${activeBusiness?.name || 'Üretimhane'} Kapak Görseli`}
+              className="w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-black/15 pointer-events-none" />
+
+            {/* Upload / Remove controls in bottom left */}
+            <div className="absolute bottom-3 left-3 sm:bottom-6 sm:left-6 z-20 flex items-center gap-2">
+              <label
+                className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-semibold text-slate-900 bg-white/95 hover:bg-white border border-white/80 backdrop-blur-md rounded-lg transition-all cursor-pointer shadow-lg"
+                title="Yeni kapak görseli yükle"
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Görsel Yükle</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleUploadHeroImage(file);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
               <button
                 type="button"
-                onClick={() => setIsHeroMenuOpen((prev) => !prev)}
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-medium text-slate-900 bg-white/95 hover:bg-white border border-white/80 backdrop-blur-md rounded-lg transition-all cursor-pointer shadow-lg"
-                title="Kapak görselini seçin"
+                onClick={handleRemoveHeroImage}
+                className="inline-flex items-center gap-1 min-h-[40px] px-2.5 py-2 text-xs font-semibold text-rose-700 bg-white/95 hover:bg-rose-50 border border-white/80 backdrop-blur-md rounded-lg transition-all cursor-pointer shadow-lg"
+                title="Kapak görselini kaldır"
               >
-                <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Görsel Seç</span>
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Kaldır</span>
               </button>
-
-              {isHeroMenuOpen && (
-                <div className="absolute bottom-full left-0 mb-2 w-64 rounded-xl border border-slate-300 bg-white backdrop-blur-md shadow-2xl p-1.5 space-y-1">
-                  <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 border-b border-slate-200">
-                    Kapak Görseli Seç
-                  </div>
-                  {HERO_IMAGE_OPTIONS.map((opt) => {
-                    const isSelected = activeHero.src === opt.src;
-                    return (
-                      <button
-                        key={opt.src}
-                        type="button"
-                        onClick={() => {
-                          onUpdateHeroImage(opt.src);
-                          setIsHeroMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between gap-2 min-h-[42px] px-2.5 py-2 rounded-lg text-left text-xs transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
-                            : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <img
-                            src={opt.src}
-                            alt={opt.label}
-                            className="w-9 h-6 rounded object-cover shrink-0 border border-slate-300"
-                            referrerPolicy="no-referrer"
-                          />
-                          <span className="truncate font-medium">{opt.label}</span>
-                        </div>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
-          )}
 
-          {/* Action buttons in bottom right */}
-          <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 flex items-center gap-2 z-10">
-            <button
-              onClick={onOpenAddBatch}
-              className="min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 active:bg-emerald-500 rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-black/40"
-            >
-              Satın Alma
-            </button>
-            <button
-              onClick={onOpenAddSale}
-              className="min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 backdrop-blur-md rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-black/40"
-            >
-              Satış
-            </button>
+            {/* Action buttons in bottom right */}
+            <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 flex items-center gap-2 z-10">
+              <button
+                onClick={onOpenAddBatch}
+                className="min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 active:bg-emerald-500 rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-black/30"
+              >
+                Satın Alma
+              </button>
+              <button
+                onClick={onOpenAddSale}
+                className="min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 backdrop-blur-md rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-lg shadow-black/30"
+              >
+                Satış
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="min-h-[190px] sm:min-h-[240px] w-full bg-slate-50/70 p-4 sm:p-6 flex flex-col justify-between gap-4 border border-dashed border-slate-300 rounded-2xl">
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-3">
+              <div className="w-11 h-11 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-xs">
+                <ImageIcon className="w-5 h-5 text-slate-400" />
+              </div>
+              <label className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 bg-white hover:bg-slate-100 active:bg-slate-200 border border-dashed border-slate-300 rounded-xl transition-all cursor-pointer shadow-xs">
+                <Upload className="w-4 h-4 text-emerald-600" />
+                <span>Görsel Yükle</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleUploadHeroImage(file);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/80">
+              <button
+                onClick={onOpenAddBatch}
+                className="min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 active:bg-emerald-500 rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-xs"
+              >
+                Satın Alma
+              </button>
+              <button
+                onClick={onOpenAddSale}
+                className="min-h-[40px] px-3.5 sm:px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-xs"
+              >
+                Satış
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Primary Financial & Operation Metrics Strip */}
@@ -685,308 +670,84 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Species Distribution & Focus Areas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
-        {/* Caridina Card */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() =>
-            setSelectedGroupDetail({
-              key: 'caridina',
-              title: 'Crystal Red & Taiwan Bee',
-              subtitle: 'Caridina Karides Kolonisi',
-              badgeText: 'Caridina Kolonisi',
-              badgeClass: 'text-red-300',
-              imageSrc: '/images/caridina_crystal_shrimp_1793999662698.jpg',
-              imageAlt: 'Caridina Crystal Red Shrimp',
-              batches: caridinaStats.batches,
-              sales: caridinaStats.sales,
-              tanks: caridinaStats.tanks,
-              liveItems: caridinaStats.liveItems,
-            })
-          }
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              e.currentTarget.click();
-            }
-          }}
-          className="group rounded-xl border border-slate-200 bg-white overflow-hidden hover:border-slate-300 hover:bg-white transition-all cursor-pointer shadow-sm hover:shadow-lg hover:shadow-slate-200/70"
-          title="Detaylı canlı ve finansal bilgileri görüntülemek için tıklayın"
-        >
-          <div className="h-28 sm:h-40 w-full overflow-hidden relative">
-            <img
-              public="/images/caridina_crystal_shrimp_1793999662698.jpg"
-              alt="Caridina Crystal Red Shrimp"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
-            <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-white/90 border border-white/70 text-[10px] font-semibold text-slate-900 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-              Detay →
-            </span>
-            <div className="absolute bottom-2 left-3 right-3">
-              <span className="text-[10px] font-semibold text-red-300 uppercase tracking-wider block">
-                Caridina Kolonisi
-              </span>
-              <h3 className="text-sm font-bold text-white leading-tight truncate">Crystal Red & Taiwan Bee</h3>
-            </div>
-          </div>
-          <div className="p-2.5 space-y-1 text-[11px]">
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Stok:</span>
-              <span className="text-slate-900 font-semibold font-mono tabular-nums">
-                {caridinaStats.totalStock} Adet
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Alınan:</span>
-              <span className="text-sky-700 font-medium font-mono tabular-nums">
-                {caridinaStats.totalPurchasedQty} Adet
-              </span>
-            </div>
-            {renderSalesOrLossRow(caridinaStats.totalSold, caridinaStats.deathCount)}
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Kâr / Zarar:</span>
-              <span className={`font-semibold font-mono tabular-nums ${getProfitPctClass(caridinaStats.profitPercentage)}`}>
-                {formatProfitPct(caridinaStats.profitPercentage)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Neocaridina Card */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() =>
-            setSelectedGroupDetail({
-              key: 'neocaridina',
-              title: 'Blue Dream & Bloody Mary',
-              subtitle: 'Neocaridina Karides Kolonisi',
-              badgeText: 'Neocaridina Kolonisi',
-              badgeClass: 'text-blue-300',
-              imageSrc: 'images/neocaridina_blue_shrimp_1793999664008.jpg',
-              imageAlt: 'Neocaridina Blue Dream Shrimp',
-              batches: neocaridinaStats.batches,
-              sales: neocaridinaStats.sales,
-              tanks: neocaridinaStats.tanks,
-              liveItems: neocaridinaStats.liveItems,
-            })
-          }
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              e.currentTarget.click();
-            }
-          }}
-          className="group rounded-xl border border-slate-200 bg-white overflow-hidden hover:border-slate-300 hover:bg-white transition-all cursor-pointer shadow-sm hover:shadow-lg hover:shadow-slate-200/70"
-          title="Detaylı canlı ve finansal bilgileri görüntülemek için tıklayın"
-        >
-          <div className="h-28 sm:h-40 w-full overflow-hidden relative">
-            <img
-              src="/images/neocaridina_blue_shrimp_1793999664008.jpg"
-              alt="Neocaridina Blue Dream Shrimp"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
-            <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-white/90 border border-white/70 text-[10px] font-semibold text-slate-900 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-              Detay →
-            </span>
-            <div className="absolute bottom-2 left-3 right-3">
-              <span className="text-[10px] font-semibold text-blue-300 uppercase tracking-wider block">
-                Neocaridina Kolonisi
-              </span>
-              <h3 className="text-sm font-bold text-white leading-tight truncate">Blue Dream & Bloody Mary</h3>
-            </div>
-          </div>
-          <div className="p-2.5 space-y-1 text-[11px]">
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Stok:</span>
-              <span className="text-slate-900 font-semibold font-mono tabular-nums">
-                {neocaridinaStats.totalStock} Adet
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Alınan:</span>
-              <span className="text-sky-700 font-medium font-mono tabular-nums">
-                {neocaridinaStats.totalPurchasedQty} Adet
-              </span>
-            </div>
-            {renderSalesOrLossRow(neocaridinaStats.totalSold, neocaridinaStats.deathCount)}
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Kâr / Zarar:</span>
-              <span className={`font-semibold font-mono tabular-nums ${getProfitPctClass(neocaridinaStats.profitPercentage)}`}>
-                {formatProfitPct(neocaridinaStats.profitPercentage)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Apistogramma Card */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() =>
-            setSelectedGroupDetail({
-              key: 'apistogramma',
-              title: 'Apistogramma Çiftleri',
-              subtitle: 'Güney Amerika Cüce Cichlid Hatları',
-              badgeText: 'Cüce Cichlid',
-              badgeClass: 'text-amber-300',
-              imagePublic: 'images/apistogramma_cichlid_1793999664297.jpg',
-              imageAlt: 'Apistogramma Cacatuoides Dwarf Cichlid',
-              batches: apistogrammaStats.batches,
-              sales: apistogrammaStats.sales,
-              tanks: apistogrammaStats.tanks,
-              liveItems: apistogrammaStats.liveItems,
-            })
-          }
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              e.currentTarget.click();
-            }
-          }}
-          className="group rounded-xl border border-slate-200 bg-white overflow-hidden hover:border-slate-300 hover:bg-white transition-all cursor-pointer shadow-sm hover:shadow-lg hover:shadow-slate-200/70"
-          title="Detaylı canlı ve finansal bilgileri görüntülemek için tıklayın"
-        >
-          <div className="h-28 sm:h-40 w-full overflow-hidden relative">
-            <img
-              src="/public/images/apistogramma_cichlid_1793999664297.jpg"
-              alt="Apistogramma Cacatuoides Dwarf Cichlid"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
-            <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-white/90 border border-white/70 text-[10px] font-semibold text-slate-900 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-              Detay →
-            </span>
-            <div className="absolute bottom-2 left-3 right-3">
-              <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider block">
-                Cüce Cichlid
-              </span>
-              <h3 className="text-sm font-bold text-white leading-tight truncate">Apistogramma Çiftleri</h3>
-            </div>
-          </div>
-          <div className="p-2.5 space-y-1 text-[11px]">
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Stok:</span>
-              <span className="text-slate-900 font-semibold font-mono tabular-nums">
-                {apistogrammaStats.totalStock} Adet
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Alınan:</span>
-              <span className="text-sky-700 font-medium font-mono tabular-nums">
-                {apistogrammaStats.totalPurchasedQty} Adet
-              </span>
-            </div>
-            {renderSalesOrLossRow(apistogrammaStats.totalSold, apistogrammaStats.deathCount)}
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Kâr / Zarar:</span>
-              <span className={`font-semibold font-mono tabular-nums ${getProfitPctClass(apistogrammaStats.profitPercentage)}`}>
-                {formatProfitPct(apistogrammaStats.profitPercentage)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Pleco Card (Sturisoma panamense) */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() =>
-            setSelectedGroupDetail({
-              key: 'pleco',
-              title: 'Sturisoma panamense',
-              subtitle: 'Pleco & Vatos Grubu',
-              badgeText: 'Pleco Grubu',
-              badgeClass: 'text-teal-300',
-              imageSrc: '/public/images/sturisoma_panamense_pleco_1794584454696.jpg',
-              imageAlt: 'Sturisoma panamense - Pleco',
-              batches: plecoStats.batches,
-              sales: plecoStats.sales,
-              tanks: plecoStats.tanks,
-              liveItems: plecoStats.liveItems,
-            })
-          }
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              e.currentTarget.click();
-            }
-          }}
-          className="group rounded-xl border border-slate-200 bg-white overflow-hidden hover:border-slate-300 hover:bg-white transition-all cursor-pointer shadow-sm hover:shadow-lg hover:shadow-slate-200/70"
-          title="Detaylı canlı ve finansal bilgileri görüntülemek için tıklayın"
-        >
-          <div className="h-28 sm:h-40 w-full overflow-hidden relative">
-            <img
-              src="/public/images/sturisoma_panamense_pleco_1794584454696.jpg"
-              alt="Sturisoma panamense - Pleco"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
-            <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-white/90 border border-white/70 text-[10px] font-semibold text-slate-900 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-              Detay →
-            </span>
-            <div className="absolute bottom-2 left-3 right-3">
-              <span className="text-[10px] font-semibold text-teal-300 uppercase tracking-wider block">
-                Pleco Grubu
-              </span>
-              <h3 className="text-sm font-bold text-white leading-tight truncate">Sturisoma panamense</h3>
-            </div>
-          </div>
-          <div className="p-2.5 space-y-1 text-[11px]">
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Stok:</span>
-              <span className="text-slate-900 font-semibold font-mono tabular-nums">
-                {plecoStats.totalStock} Adet
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Alınan:</span>
-              <span className="text-sky-700 font-medium font-mono tabular-nums">
-                {plecoStats.totalPurchasedQty} Adet
-              </span>
-            </div>
-            {renderSalesOrLossRow(plecoStats.totalSold, plecoStats.deathCount)}
-            <div className="flex items-center justify-between text-slate-500">
-              <span>Kâr / Zarar:</span>
-              <span className={`font-semibold font-mono tabular-nums ${getProfitPctClass(plecoStats.profitPercentage)}`}>
-                {formatProfitPct(plecoStats.profitPercentage)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamically Added / Defined Extra Live Animal Group Cards */}
-        {extraLiveGroups.map((group, idx) => {
-          const theme = DEFAULT_GROUP_THEMES[idx % DEFAULT_GROUP_THEMES.length];
-          const customImg = getCustomGroupImage(group.id, group.label, group.strains);
+        {[
+          {
+            key: 'caridina',
+            title: 'Crystal Red & Taiwan Bee',
+            subtitle: 'Caridina Karides Kolonisi',
+            badgeText: 'Caridina Kolonisi',
+            badgeClass: 'text-red-300',
+            emptyBadgeClass: 'text-red-700',
+            imageAlt: 'Caridina Crystal Red Shrimp',
+            stats: caridinaStats,
+          },
+          {
+            key: 'neocaridina',
+            title: 'Blue Dream & Bloody Mary',
+            subtitle: 'Neocaridina Karides Kolonisi',
+            badgeText: 'Neocaridina Kolonisi',
+            badgeClass: 'text-blue-300',
+            emptyBadgeClass: 'text-blue-700',
+            imageAlt: 'Neocaridina Blue Dream Shrimp',
+            stats: neocaridinaStats,
+          },
+          {
+            key: 'apistogramma',
+            title: 'Apistogramma Çiftleri',
+            subtitle: 'Güney Amerika Cüce Cichlid Hatları',
+            badgeText: 'Cüce Cichlid',
+            badgeClass: 'text-amber-300',
+            emptyBadgeClass: 'text-amber-700',
+            imageAlt: 'Apistogramma Cacatuoides Dwarf Cichlid',
+            stats: apistogrammaStats,
+          },
+          {
+            key: 'pleco',
+            title: 'Sturisoma panamense',
+            subtitle: 'Pleco & Vatos Grubu',
+            badgeText: 'Pleco Grubu',
+            badgeClass: 'text-teal-300',
+            emptyBadgeClass: 'text-teal-700',
+            imageAlt: 'Sturisoma panamense - Pleco',
+            stats: plecoStats,
+          },
+          ...extraLiveGroups.map((group, idx) => {
+            const theme = DEFAULT_GROUP_THEMES[idx % DEFAULT_GROUP_THEMES.length];
+            return {
+              key: group.id,
+              title: group.label,
+              subtitle:
+                group.strains.length > 0
+                  ? group.strains.join(', ')
+                  : 'Tanımlı Canlı Grubu',
+              badgeText: 'Tanımlı Canlı Grubu',
+              badgeClass: theme.accentText,
+              emptyBadgeClass: theme.emptyAccentText,
+              imageAlt: group.label,
+              stats: group,
+            };
+          }),
+        ].map((card) => {
+          const uploadedImg = speciesImages[card.key];
           return (
             <div
-              key={group.id}
+              key={card.key}
               role="button"
               tabIndex={0}
               onClick={() =>
                 setSelectedGroupDetail({
-                  key: group.id,
-                  title: group.label,
-                  subtitle:
-                    group.strains.length > 0
-                      ? group.strains.join(', ')
-                      : 'Tanımlı Canlı Grubu',
-                  badgeText: 'Tanımlı Canlı Grubu',
-                  badgeClass: theme.accentText,
-                  imageSrc: customImg?.src,
-                  imageAlt: customImg?.alt,
-                  gradientClass: theme.gradient,
-                  batches: group.batches,
-                  sales: group.sales,
-                  tanks: group.tanks,
-                  liveItems: group.liveItems,
+                  key: card.key,
+                  title: card.title,
+                  subtitle: card.subtitle,
+                  badgeText: card.badgeText,
+                  badgeClass: card.badgeClass,
+                  emptyBadgeClass: card.emptyBadgeClass,
+                  imageSrc: uploadedImg,
+                  imageAlt: card.imageAlt,
+                  batches: card.stats.batches,
+                  sales: card.stats.sales,
+                  tanks: card.stats.tanks,
+                  liveItems: card.stats.liveItems,
                 })
               }
               onKeyDown={(e) => {
@@ -998,59 +759,120 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               className="group rounded-xl border border-slate-200 bg-white overflow-hidden hover:border-slate-300 hover:bg-white transition-all cursor-pointer shadow-sm hover:shadow-lg hover:shadow-slate-200/70"
               title="Detaylı canlı ve finansal bilgileri görüntülemek için tıklayın"
             >
-              <div
-                className={`h-28 sm:h-40 w-full overflow-hidden relative ${
-                  customImg ? '' : `bg-gradient-to-br ${theme.gradient}`
-                }`}
-              >
-                {customImg ? (
+              {uploadedImg ? (
+                <div className="h-32 sm:h-40 w-full overflow-hidden relative">
                   <img
-                    src={customImg.src}
-                    alt={customImg.alt}
+                    src={uploadedImg}
+                    alt={card.imageAlt}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
                   />
-                ) : (
-                  <>
-                    <div className="absolute inset-0 flex items-center justify-center opacity-20 group-hover:scale-110 transition-transform duration-500">
-                      <Fish className="w-16 sm:w-20 h-16 sm:h-20 text-white" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-transparent" />
+                  <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1 z-10">
+                    <span className="px-1.5 py-0.5 rounded-md bg-white/90 border border-white/70 text-[10px] font-semibold text-slate-900 backdrop-blur-sm shrink-0">
+                      Detay →
+                    </span>
+                    <div
+                      className="flex items-center gap-1 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <label
+                        className="inline-flex items-center gap-1 min-h-[28px] px-1.5 sm:px-2 py-1 rounded-md bg-white/95 hover:bg-white text-slate-900 border border-white/80 text-[10px] font-semibold cursor-pointer shadow-sm"
+                        title="Görsel Yükle"
+                      >
+                        <Upload className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span className="sm:hidden">Yükle</span>
+                        <span className="hidden sm:inline">Görsel Yükle</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleUploadSpeciesImage(card.key, file);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveSpeciesImage(card.key);
+                        }}
+                        className="min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md bg-white/95 hover:bg-rose-50 text-rose-700 border border-white/80 cursor-pointer shadow-sm"
+                        title="Görseli kaldır"
+                        aria-label="Görseli kaldır"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <div className="absolute top-2 right-2">
-                      <div className={`w-7 h-7 rounded-lg border flex items-center justify-center ${theme.iconBg}`}>
-                        <Fish className="w-3.5 h-3.5" />
-                      </div>
-                    </div>
-                  </>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
-                <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-white/90 border border-white/70 text-[10px] font-semibold text-slate-900 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                  Detay →
-                </span>
-                <div className="absolute bottom-2 left-3 right-3">
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider block ${theme.accentText}`}>
-                    Tanımlı Canlı Grubu
-                  </span>
-                  <h3 className="text-sm font-bold text-white leading-tight truncate">{group.label}</h3>
+                  </div>
+                  <div className="absolute bottom-2 left-3 right-3">
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider block ${card.badgeClass}`}>
+                      {card.badgeText}
+                    </span>
+                    <h3 className="text-sm font-bold text-white leading-tight truncate">{card.title}</h3>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="min-h-[128px] sm:h-40 w-full bg-slate-50 border-b border-slate-200 p-2.5 sm:p-3 flex flex-col justify-between relative">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider truncate ${card.emptyBadgeClass}`}>
+                      {card.badgeText}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-semibold text-slate-600 shrink-0">
+                      Detay →
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-center my-auto py-1">
+                    <label
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 active:bg-slate-200 border border-dashed border-slate-300 text-slate-700 text-[11px] font-semibold shadow-xs cursor-pointer transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Görsel Yükle</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleUploadSpeciesImage(card.key, file);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-slate-900 leading-tight truncate">
+                    {card.title}
+                  </h3>
+                </div>
+              )}
+
               <div className="p-2.5 space-y-1 text-[11px]">
                 <div className="flex items-center justify-between text-slate-500">
                   <span>Stok:</span>
                   <span className="text-slate-900 font-semibold font-mono tabular-nums">
-                    {group.totalStock} Adet
+                    {card.stats.totalStock} Adet
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-slate-500">
                   <span>Alınan:</span>
                   <span className="text-sky-700 font-medium font-mono tabular-nums">
-                    {group.totalPurchasedQty} Adet
+                    {card.stats.totalPurchasedQty} Adet
                   </span>
                 </div>
-                {renderSalesOrLossRow(group.totalSold, group.deathCount)}
+                {renderSalesOrLossRow(card.stats.totalSold, card.stats.deathCount)}
                 <div className="flex items-center justify-between text-slate-500">
                   <span>Kâr / Zarar:</span>
-                  <span className={`font-semibold font-mono tabular-nums ${getProfitPctClass(group.profitPercentage)}`}>
-                    {formatProfitPct(group.profitPercentage)}
+                  <span className={`font-semibold font-mono tabular-nums ${getProfitPctClass(card.stats.profitPercentage)}`}>
+                    {formatProfitPct(card.stats.profitPercentage)}
                   </span>
                 </div>
               </div>
@@ -1062,9 +884,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Species Group Detailed Modal */}
       {selectedGroupDetail && (
         <SpeciesGroupDetailModal
-          group={selectedGroupDetail}
+          group={{
+            ...selectedGroupDetail,
+            imageSrc: speciesImages[selectedGroupDetail.key],
+          }}
           onClose={() => setSelectedGroupDetail(null)}
           onInspectBatch={onInspectBatch}
+          onUploadImage={handleUploadSpeciesImage}
+          onRemoveImage={handleRemoveSpeciesImage}
         />
       )}
 

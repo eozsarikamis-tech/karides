@@ -834,7 +834,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               subtitle: 'Güney Amerika Cüce Cichlid Hatları',
               badgeText: 'Cüce Cichlid',
               badgeClass: 'text-amber-300',
-              imagePublic: '/images/apistogramma_cichlid_1793999664297.jpg',
+              imagePublic: 'images/apistogramma_cichlid_1793999664297.jpg',
               imageAlt: 'Apistogramma Cacatuoides Dwarf Cichlid',
               batches: apistogrammaStats.batches,
               sales: apistogrammaStats.sales,
